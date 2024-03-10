@@ -173,35 +173,43 @@ if __name__ == '__main__':
             msg = ""
             for playerTuple in server.playersTuple:
                 pool.submit(server.startGameMode, playerTuple, timer)
-            time.sleep(10)
-            for i, s in enumerate(server.solutionTuples):
-                # remove the client from the game if it didn't answer in time\correctly
-                if(s[0] == solution):
-                    msg += f"{s[1]} is correct!\n"
-                else:
-                    msg += f"{s[1]} is incorrect!\n"
+            
+            start_time = time.time()
+            while time.time() - start_time < 10:
+                with server.lock:
+                    if(len(server.solutionTuples) == len(server.playersTuple)):
+                        break
+                    time.sleep(0.5)  # Sleep for 1 second before rechecking
+            
+            with server.lock:
+                for i, s in enumerate(server.solutionTuples):
+                    # remove the client from the game if it didn't answer in time\correctly
+                    if(s[0] == solution):
+                        msg += f"{s[1]} is correct!\n"
+                    else:
+                        msg += f"{s[1]} is incorrect!\n"
 
-            #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
-            current_players = remove_wrong_answer_players(current_players, server.solutionTuples, solution)
-            #report of all incorrect\correct players
+                #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
+                current_players = remove_wrong_answer_players(current_players, server.solutionTuples, solution)
+                #report of all incorrect\correct players
+                for playerTuple in server.playersTuple:
+                    playerTuple[0].send(msg.encode("utf-8"))
+                print(msg)
+                msg = ""    
+                if(len(current_players) == 1):
+                    msg += f"{current_players[0][2]} is the winner!"
+                    for playerTuple in server.playersTuple:
+                        playerTuple[0].send(msg.encode("utf-8"))
+                    print(msg)
+                    msg = "Game over, sending out offer requests..." 
+                    for playerTuple in server.playersTuple:
+                        playerTuple[0].send(msg.encode("utf-8"))
+                    print(msg)
             for playerTuple in server.playersTuple:
-                playerTuple[0].send(msg.encode("utf-8"))
-            print(msg)
-            msg = ""    
-            if(len(current_players) == 1):
-                msg += f"{current_players[0][2]} is the winner!"
-                for playerTuple in server.playersTuple:
-                    playerTuple[0].send(msg.encode("utf-8"))
-                print(msg)
-                msg = "Game over, sending out offer requests..." 
-                for playerTuple in server.playersTuple:
-                    playerTuple[0].send(msg.encode("utf-8"))
-                print(msg)
-        for playerTuple in server.playersTuple:
-            try:
-                playerTuple[0].close()
-            except:
-                continue
+                try:
+                    playerTuple[0].close()
+                except:
+                    continue
         
         
          

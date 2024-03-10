@@ -39,12 +39,13 @@ class Server:
         # Join the parts back into a string
         modified_ip = '.'.join(ip_parts)
 
-        #threading.Timer(1.0, self.brodcastUdpOffer).start()
+        threading.Timer(1.0, self.brodcastUdpOffer).start()
 
         # Pack the message in a udp format.
         offerMessage = struct.pack("Ibh", 0xabcddcba, 0x2, self.hostPort)
         # brodacast the message to all clients connected to the net
         self.UDPSocket.sendto(
+        # offerMessage, (modified_ip, self.udpBroadcastPort))
         offerMessage, ('<broadcast>', self.udpBroadcastPort))
 
     def waitForClient(self):

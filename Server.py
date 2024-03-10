@@ -153,7 +153,7 @@ if __name__ == '__main__':
         if len(server.teams) == 0:
             continue
 
-        welcomeMsg = "Welcome to the Mystic server, where we are answering trivia questions about English Premier League.\n" + getPlayersNames() 
+        welcomeMsg = "Welcome to the Mystic server, where we are answering trivia questions about English Premier League.\n" + getPlayersNames(server) 
 
         print(welcomeMsg)
         counter = 0

@@ -20,6 +20,8 @@ class Server:
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
         self.teams = []
+        self.sol=[]
+        self.lock=threading.Lock()
         # self.DevNet = "172.1.0.4"
         self.udpBroadcastPort = 13117
         self.gemeEndTime = 10
@@ -37,12 +39,13 @@ class Server:
         # Join the parts back into a string
         modified_ip = '.'.join(ip_parts)
 
-        threading.Timer(1.0, self.brodcastUdpOffer).start()
+        #threading.Timer(1.0, self.brodcastUdpOffer).start()
+
         # Pack the message in a udp format.
         offerMessage = struct.pack("Ibh", 0xabcddcba, 0x2, self.hostPort)
         # brodacast the message to all clients connected to the net
         self.UDPSocket.sendto(
-        offerMessage, (modified_ip, self.udpBroadcastPort))
+        offerMessage, ('<broadcast>', self.udpBroadcastPort))
 
     def waitForClient(self):
         '''
@@ -66,12 +69,13 @@ class Server:
             except:
                 continue
 
-    def startGameMode(self, team, timer):
+    def startGameMode(self, player, timer):
         while time.time() - timer < self.gemeEndTime:
             try:
-                team[0].settimeout(0.01)
-                sol = team.recv(self.bufferSize).decode("utf-8")
-                return (sol, team[2])
+                player[0].settimeout(0.01)
+                userSolution = player.recv(self.bufferSize).decode("utf-8")
+                with self.lock:
+                    self.sol.append(userSolution, player[2])
             except:
                 pass
             
@@ -174,19 +178,17 @@ if __name__ == '__main__':
                 team[0].send(bytes(msg, "utf-8"))
             print(msg)
             msg = ""
-            sol = []
+
             for team in server.teams:
-                sol.append(pool.submit(server.startGameMode, team, timer))
-            
-
-
-            for i, s in enumerate(sol):
+                pool.submit(server.startGameMode, team, timer)
+            time.sleep(10)
+            for i, s in enumerate(server.sol):
                 # remove the client from the game if it didn't answer in time\correctly
-                if(s.result() == solution):
+                if(s[0] == solution):
                     msg += f"{s[1]} is correct!\n"
                 else:
                     msg += f"{s[1]} is incorrect!\n"
-            current_players = remove_wrong_answer_players(current_players, sol, solution)
+            current_players = remove_wrong_answer_players(current_players, server.sol, solution)
             for team in server.teams:
                 team[0].send(bytes(msg, "utf-8"))
             print(msg)

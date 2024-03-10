@@ -185,13 +185,7 @@ if __name__ == '__main__':
                 msg += f"{current_players[0][2]} is the winner!"
                 for team in server.teams:
                     team[0].send(bytes(msg, "utf-8"))
-                msg = ""
-
-            for team in server.teams:
-                try:
-                    team[0].sendall(bytes(gameOverMsg, "utf-8"))
-                except:
-                    continue
+                msg = ""      
         for team in server.teams:
             try:
                 team[0].close()

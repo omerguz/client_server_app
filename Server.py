@@ -178,6 +178,8 @@ if __name__ == '__main__':
             for team in server.teams:
                 sol.append(pool.submit(server.startGameMode, team, timer))
             
+
+
             for i, s in enumerate(sol):
                 # remove the client from the game if it didn't answer in time\correctly
                 if(s.result() == solution):

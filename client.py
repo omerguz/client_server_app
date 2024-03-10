@@ -95,7 +95,7 @@ class Client:
             USER_NAME = None
             if not self.BOT_MODE:
                 print("Hello client! Enter your name : ")
-                USER_NAME = input()
+                USER_NAME = input().strip()
             else:
                 USER_NAME = "BOT_" + f"{self.id}"
                 print(f"I'm a BOT ! My name is : {USER_NAME}")
@@ -108,7 +108,7 @@ class Client:
                     print("Connected to the server over TCP.")
 
                 # Send team name to the server
-                self.sendData(client_tcp_socket, f"{USER_NAME}\n")
+                self.sendData(client_tcp_socket, f"{USER_NAME}")
 
                 # Enter game mode
                 self.handle_game_mode(client_tcp_socket)  
@@ -132,15 +132,23 @@ class Client:
             print(welcome_message)
             # Receive and print trivia questions, and send answers
             while True:
-                question = self.recvData(client_tcp_socket)
-                print(question)
-                
+                msg = self.recvData(client_tcp_socket)
+
+                if msg.startswith("Game over"):
+                    break
+
+                print(msg)
                 user_input_aswer = self.get_input_from_user()
                 answer = validAnswer(user_input_aswer)
                 if answer is not None:
                     self.sendData(client_tcp_socket, answer)
                 else:
                     print("Invalid input")
+                    # TODO : Check if need to while and break
+                
+                results_msg = self.recvData(client_tcp_socket)
+                print(results_msg)
+
         except Exception as e:
             print(f"Error in game mode: {e}")
         finally:

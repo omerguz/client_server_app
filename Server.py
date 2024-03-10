@@ -61,12 +61,8 @@ class Server:
             except:
                 continue
 
-    def startGameMode(self, team):
-        '''
-
-        '''
-        startTime = time.time()
-        while time.time() - startTime < self.gemeEndTime:
+    def startGameMode(self, team, timer):
+        while time.time() - timer < self.gemeEndTime:
             try:
                 team[0].settimeout(0.01)
                 sol = team.recv(self.bufferSize).decode("utf-8")
@@ -77,6 +73,9 @@ class Server:
 def remove_wrong_answer_players(current_players, sol, correct_answer):
     # Get the names of players who gave the wrong answer
     wrong_answer_players = {player_name for solution, player_name in sol if solution != correct_answer}
+    not_answered_players = {player_name for _, _, player_name in current_players if player_name not in [player_name for _, player_name in sol]}
+    wrong_answer_players = wrong_answer_players.union(not_answered_players)
+    
     all_player_names = [player_name for _, _, player_name in current_players]
     all_exist = all(player_name in all_player_names for player_name in wrong_answer_players)
     if not all_exist:
@@ -167,10 +166,12 @@ if __name__ == '__main__':
             welcomeMsg = ""
             for team in server.teams:
                 team[0].send(bytes(msg, "utf-8"))
+            print(msg)
             msg = ""
             sol = []
             for team in server.teams:
-                sol.append(pool.submit(server.startGameMode, team))
+                sol.append(pool.submit(server.startGameMode, team, timer))
+            
             for i, s in enumerate(sol):
                 # remove the client from the game if it didn't answer in time\correctly
                 if(s.result() == solution):
@@ -180,11 +181,13 @@ if __name__ == '__main__':
             current_players = remove_wrong_answer_players(current_players, sol, solution)
             for team in server.teams:
                 team[0].send(bytes(msg, "utf-8"))
+            print(msg)
             msg = ""    
             if(len(current_players) == 1):
                 msg += f"{current_players[0][2]} is the winner!"
                 for team in server.teams:
                     team[0].send(bytes(msg, "utf-8"))
+                print(msg)
                 msg = ""      
         for team in server.teams:
             try:

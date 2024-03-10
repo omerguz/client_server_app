@@ -187,27 +187,14 @@ if __name__ == '__main__':
                     team[0].send(bytes(msg, "utf-8"))
                 msg = ""
 
-                
-
-
-
-
-
-
-
-
-
-
-
-
             for team in server.teams:
                 try:
                     team[0].sendall(bytes(gameOverMsg, "utf-8"))
                 except:
                     continue
-            for team in server.teams:
-                try:
-                    team[0].close()
-                except:
-                    continue
-            print("Game over, sending out offer requests...")
+        for team in server.teams:
+            try:
+                team[0].close()
+            except:
+                continue
+        print("Game over, sending out offer requests...")

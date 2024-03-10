@@ -197,8 +197,13 @@ if __name__ == '__main__':
             for playerTuple in server.playersTuple:
                 pool.submit(server.startGameMode, playerTuple, timer)
 
-            time.sleep(5)
-
+            start_time = time.time()
+            while time.time() - start_time < 10:
+                with server.lock:
+                    if(len(server.solutionTuples) == len(server.playersTuple)):
+                        break
+                    time.sleep(0.5)  # Sleep for 1 second before rechecking
+            
             with server.lock:
                 for i, s in enumerate(server.solutionTuples):
                     # remove the client from the game if it didn't answer in time\correctly

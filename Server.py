@@ -19,8 +19,8 @@ class Server:
         self.hostName = socket.gethostname()
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
-        self.teams = []
-        self.sol=[]
+        self.playersTuple = []
+        self.solutionTuples=[]
         self.lock=threading.Lock()
         # self.DevNet = "172.1.0.4"
         self.udpBroadcastPort = 13117
@@ -58,31 +58,28 @@ class Server:
         start_time = 0
         UdpBroadcastThread = threading.Thread(target=server.brodcastUdpOffer)
         UdpBroadcastThread.start()
-        while (len(self.teams) >= 1 and time.time() - start_time < 10) or len(server.teams) < 1:
+        while (len(self.playersTuple) >= 1 and time.time() - start_time < 10) or len(server.playersTuple) < 1:
             self.TCPSocket.settimeout(10)
             try:
                 clientSocket, clientAddress = self.TCPSocket.accept()
-                teamName = clientSocket.recv(self.bufferSize).decode("utf-8")
-                self.teams.append((clientSocket, clientAddress, teamName))
-                if len(self.teams) == 1:    # start the timer when the first client joins
+                playerName = clientSocket.recv(self.bufferSize).decode("utf-8")
+                self.playersTuple.append((clientSocket, clientAddress, playerName))
+                if len(self.playersTuple) == 1:    # start the timer when the first client joins
                     start_time = time.time()
             except:
                 continue
 
     def startGameMode(self, player, timer):
-        while time.time() - timer < self.gemeEndTime:
-            try:
-                player[0].settimeout(0.01)
-                userSolution = player.recv(self.bufferSize).decode("utf-8")
-                with self.lock:
-                    self.sol.append(userSolution, player[2])
-            except:
-                pass
+        while time.time() - timer < 10000:
+            userSolution = player[0].recv(self.bufferSize).decode("utf-8")
+            with self.lock:
+                self.solutionTuples.append(userSolution, player[2])
+
             
-def remove_wrong_answer_players(current_players, sol, correct_answer):
+def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
     # Get the names of players who gave the wrong answer
-    wrong_answer_players = {player_name for solution, player_name in sol if solution != correct_answer}
-    not_answered_players = {player_name for _, _, player_name in current_players if player_name not in [player_name for _, player_name in sol]}
+    wrong_answer_players = {player_name for solution, player_name in solutionTuples if solution != correct_answer}
+    not_answered_players = {player_name for _, _, player_name in current_players if player_name not in [player_name for _, player_name in solutionTuples]}
     wrong_answer_players = wrong_answer_players.union(not_answered_players)
     
     all_player_names = [player_name for _, _, player_name in current_players]
@@ -127,8 +124,8 @@ def getPlayersNames(server):
     Retrieve the names of the players from the server's teams.
     """
     player_names = ""
-    for i, team in enumerate(server.teams):
-        player_names += f"Player Number {i}: {team[2]}\n"
+    for i, playerTuple in enumerate(server.playersTuple):
+        player_names += f"Player Number {i}: {playerTuple[2]}\n"
     # Remove the trailing comma and space
     return player_names
 
@@ -152,56 +149,55 @@ if __name__ == '__main__':
             pass
     server.TCPSocket.listen()
     while True:
-        server.teams = []
+        server.playersTuple = []
         # Print start message
         print(f"Server started, listening on IP address {server.hostIP}")
         # Start wait for clients stage
         server.waitForClient()
 
-        if len(server.teams) == 0:
+        if len(server.playersTuple) == 0:
             continue
 
         welcomeMsg = f"Welcome to the Mystic server, where we are answering trivia questions about English Premier League.\n{getPlayersNames(server)}"
 
         print(welcomeMsg)
-        for team in server.teams:
-            team[0].send(bytes(welcomeMsg, "utf-8"))
+        for playerTuple in server.playersTuple:
+            playerTuple[0].send(bytes(welcomeMsg, "utf-8"))
         counter = 0
-        pool =  concurrent.futures.ThreadPoolExecutor(len(server.teams))
-        current_players = server.teams
+        pool =  concurrent.futures.ThreadPoolExecutor(len(server.playersTuple))
+        current_players = server.playersTuple
         while len(current_players) >= 1:
             timer = time.time() #round is only 10 seconds
             problem, solution = get_random_question()
             counter += 1
-            msg = f"Round {counter}, played by " + format_names([team[2] for team in current_players]) + f": True or false: {problem}\n"
-            for team in server.teams:
-                team[0].send(bytes(msg, "utf-8"))
+            msg = f"Round {counter}, played by " + format_names([playerTuple[2] for playerTuple in current_players]) + f": True or false: {problem}\n"
+            for playerTuple in server.playersTuple:
+                playerTuple[0].send(msg.encode("utf-8"))
             print(msg)
             msg = ""
-
-            for team in server.teams:
-                pool.submit(server.startGameMode, team, timer)
-            time.sleep(10)
-            for i, s in enumerate(server.sol):
+            for playerTuple in server.playersTuple:
+                pool.submit(server.startGameMode, playerTuple, timer)
+            time.sleep(30)
+            for i, s in enumerate(server.solutionTuples):
                 # remove the client from the game if it didn't answer in time\correctly
                 if(s[0] == solution):
                     msg += f"{s[1]} is correct!\n"
                 else:
                     msg += f"{s[1]} is incorrect!\n"
-            current_players = remove_wrong_answer_players(current_players, server.sol, solution)
-            for team in server.teams:
-                team[0].send(bytes(msg, "utf-8"))
+            current_players = remove_wrong_answer_players(current_players, server.solutionTuples, solution)
+            for playerTuple in server.playersTuple:
+                playerTuple[0].send(bytes(msg, "utf-8"))
             print(msg)
             msg = ""    
             if(len(current_players) == 1):
                 msg += f"{current_players[0][2]} is the winner!"
-                for team in server.teams:
-                    team[0].send(bytes(msg, "utf-8"))
+                for playerTuple in server.playersTuple:
+                    playerTuple[0].send(bytes(msg, "utf-8"))
                 print(msg)
                 msg = ""      
-        for team in server.teams:
+        for playerTuple in server.playersTuple:
             try:
-                team[0].close()
+                playerTuple[0].close()
             except:
                 continue
         print("Game over, sending out offer requests...")

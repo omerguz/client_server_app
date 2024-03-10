@@ -20,7 +20,7 @@ class Server:
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
         self.teams = []
-        self.DevNet = "172.1.0.4"
+        # self.DevNet = "172.1.0.4"
         self.udpBroadcastPort = 13117
         self.gemeEndTime = 10
         self.bufferSize = 1024
@@ -31,13 +31,18 @@ class Server:
         to all clients in the network evry 1 second via UDP
         '''
         # Start and set the thread to send offers every 1 sec.
+        ip_parts = self.hostIP.split('.')
+        # Change the last value
+        ip_parts[-1] = "255"
+        # Join the parts back into a string
+        modified_ip = '.'.join(ip_parts)
+
         threading.Timer(1.0, self.brodcastUdpOffer).start()
         # Pack the message in a udp format.
         offerMessage = struct.pack("Ibh", 0xabcddcba, 0x2, self.hostPort)
         # brodacast the message to all clients connected to the net
         self.UDPSocket.sendto(
-            offerMessage, (self.DevNet, self.udpBroadcastPort))
-        # offerMessage, (self.hostIP, self.udpBroadcastPort))
+        offerMessage, (modified_ip, self.udpBroadcastPort))
 
     def waitForClient(self):
         '''
@@ -119,7 +124,7 @@ def getPlayersNames(server):
     """
     player_names = ""
     for i, team in enumerate(server.teams):
-        player_names += "Player Number {i}: {team[2]}\n"
+        player_names += f"Player Number {i}: {team[2]}\n"
     # Remove the trailing comma and space
     return player_names
 
@@ -152,18 +157,19 @@ if __name__ == '__main__':
         if len(server.teams) == 0:
             continue
 
-        welcomeMsg = "Welcome to the Mystic server, where we are answering trivia questions about English Premier League.\n" + getPlayersNames(server) 
+        welcomeMsg = f"Welcome to the Mystic server, where we are answering trivia questions about English Premier League.\n{getPlayersNames(server)}"
 
         print(welcomeMsg)
+        for team in server.teams:
+            team[0].send(bytes(welcomeMsg, "utf-8"))
         counter = 0
         pool =  concurrent.futures.ThreadPoolExecutor(len(server.teams))
         current_players = server.teams
-        while len(current_players) > 1:
+        while len(current_players) >= 1:
             timer = time.time() #round is only 10 seconds
-            problem, solution = server.get_random_question()
+            problem, solution = get_random_question()
             counter += 1
-            msg = welcomeMsg + "Round {counter}, played by " + format_names(team[2] for team in current_players) + ": True or false: {problem}\n"
-            welcomeMsg = ""
+            msg = f"Round {counter}, played by " + format_names([team[2] for team in current_players]) + f": True or false: {problem}\n"
             for team in server.teams:
                 team[0].send(bytes(msg, "utf-8"))
             print(msg)

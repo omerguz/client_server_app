@@ -61,7 +61,7 @@ def getServerConnection():
     # TODO : check if ok
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR , 1)
-    udp_socket.bind(('172.1.255.255', SERVER_PORT))
+    udp_socket.bind(("", SERVER_PORT))
 
     msgAndAddr = None
     offerMsgArrived = False

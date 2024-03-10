@@ -10,7 +10,7 @@ IP_ADDRESS = "172.1.0.4"
 MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
 MESSAGE_TYPE_OFFER = b'\x02'
 SERVER_PORT_TCP_INDEX = 36
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def recvData(socket):
     data = None
@@ -28,7 +28,6 @@ def sendData(socket, data):
         # Handle debug mode logic when sending
         # Your debug mode logic here
         print("Send message : ",data)
-        pass
     else:
         socket.send(data.encode("utf-8"))
 
@@ -119,9 +118,9 @@ def validAnswer(answer):
     false_values = {'N', 'F', '0'}
 
     if answer.upper() in true_values:
-        return True
+        return "True"
     elif answer.upper() in false_values:
-        return False
+        return "False"
     else:
         return None  # Invalid answer
     
@@ -136,9 +135,10 @@ def handle_game_mode(client_tcp_socket):
         while True:
             question = recvData(client_tcp_socket)
             print(question)
-            answer = input("Enter your answer (Y/T/1 for True or N/F/0 for False): ")
-            if validAnswer(answer) is not None:
-                sendData(client_tcp_socket, answer.upper())
+            user_input_aswer = input("Enter your answer (Y/T/1 for True or N/F/0 for False): ")
+            answer = validAnswer(user_input_aswer)
+            if answer is not None:
+                sendData(client_tcp_socket, answer)
             else:
                 print("Invalid input")
     except Exception as e:

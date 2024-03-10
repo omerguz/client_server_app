@@ -39,7 +39,7 @@ class Server:
         # Join the parts back into a string
         modified_ip = '.'.join(ip_parts)
 
-        #threading.Timer(1.0, self.brodcastUdpOffer).start()
+        threading.Timer(1.0, self.brodcastUdpOffer).start()
 
         # Pack the message in a udp format.
         offerMessage = struct.pack("Ibh", 0xabcddcba, 0x2, self.hostPort)

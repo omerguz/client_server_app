@@ -36,7 +36,7 @@ class Server:
             self.UDPSocket.sendto(
             # offerMessage, (modified_ip, self.udpBroadcastPort))
             offerMessage, ('<broadcast>', self.udpBroadcastPort))
-            time.sleep(5)
+            time.sleep(0.5)
 
     def waitForClient(self):
         '''
@@ -62,14 +62,30 @@ class Server:
                 continue
 
     def startGameMode(self, player, timer):
-        while time.time() - timer < 10:
-            userSolution = player[0].recv(self.bufferSize).decode("utf-8")
-            with self.lock:
-                self.solutionTuples.append(userSolution, player[2])
+        start_time = time.time()
+        while time.time() - start_time < 10:  # Ensure the loop runs for a maximum of 10 seconds
+            try:
+                # Set a timeout for the recv call
+                player[0].settimeout(0.5)
+                
+                # Receive data from the player
+                userSolution = player[0].recv(self.bufferSize).decode("utf-8")
+                
+                # Append the solution to the list of solution tuples
+                with self.lock:
+                    self.solutionTuples.append((userSolution, player[2]))
+                    break
+            
+            except socket.timeout:
+                # Handle timeout exception (no data received within the timeout period)
+                pass
+            except Exception as e:
+                # Handle other exceptions
+                print(f"Error in startGameMode: {e}")
 
             
 def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
-    # Get the names of players who gave the wrong answer
+    # Get the names of players who gave the wrong answer    
     wrong_answer_players = {player_name for solution, player_name in solutionTuples if solution != correct_answer}
     not_answered_players = {player_name for _, _, player_name in current_players if player_name not in [player_name for _, player_name in solutionTuples]}
     wrong_unanswered_players = wrong_answer_players.union(not_answered_players)
@@ -178,6 +194,7 @@ if __name__ == '__main__':
                 playerTuple[0].send(msg.encode("utf-8"))
             print(msg)
             msg = ""
+            server.solutionTuples = []
             for playerTuple in server.playersTuple:
                 pool.submit(server.startGameMode, playerTuple, timer)
             
@@ -202,21 +219,21 @@ if __name__ == '__main__':
                 for playerTuple in server.playersTuple:
                     playerTuple[0].send(msg.encode("utf-8"))
                 print(msg)
-                msg = ""    
+                msg = "Congratulations to the winner: "    
                 if(len(current_players) == 1):
-                    msg += f"{current_players[0][2]} is the winner!"
+                    msg += f"{current_players[0][2]}"
                     for playerTuple in server.playersTuple:
                         playerTuple[0].send(msg.encode("utf-8"))
                     print(msg)
                     msg = "Game over, sending out offer requests..." 
-                    for playerTuple in server.playersTuple:
-                        playerTuple[0].send(msg.encode("utf-8"))
                     print(msg)
-            for playerTuple in server.playersTuple:
-                try:
-                    playerTuple[0].close()
-                except:
-                    continue
+                    break
+        
+        for playerTuple in server.playersTuple:
+            try:
+                playerTuple[0].close()
+            except:
+                continue
         
         
          

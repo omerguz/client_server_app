@@ -134,7 +134,8 @@ class Client:
             while True:
                 msg = self.recvData(client_tcp_socket)
 
-                if msg.startswith("Game over"):
+                if msg.startswith("Congratulations"):
+                    print(msg)
                     break
 
                 print(msg)

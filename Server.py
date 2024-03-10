@@ -20,14 +20,13 @@ class Server:
         self.hostName = socket.gethostname()
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
-        self.playersTuple = []
-        self.solutionTuples=[]
-        self.lock=threading.Lock()
-        self.udpflg = False
-        # self.DevNet = "172.1.0.4"
-        self.udpBroadcastPort = 13117
-        self.gemeEndTime = 10
-        self.bufferSize = 1024
+        self.playersTuple = [] # Stores information about players (socket, address, name)
+        self.solutionTuples = [] # Stores solutions submitted by players (solution, player_name)
+        self.lock = threading.Lock() # Lock for thread safety
+        self.udpflg = False # Flag for UDP broadcast
+        self.udpBroadcastPort = 13117 # UDP broadcast port
+        self.gemeEndTime = 10 # Game end time in seconds
+        self.bufferSize = 1024 # Buffer size for socket communication
 
     def brodcastUdpOffer(self):    
 
@@ -161,7 +160,15 @@ if __name__ == '__main__':
             playerTuple[0].send(bytes(welcomeMsg, "utf-8"))
         counter = 0
         pool =  concurrent.futures.ThreadPoolExecutor(len(server.playersTuple))
-        current_players = copy.deepcopy(server.playersTuple)
+
+        current_players=[]
+        for player_tuple in server.playersTuple:
+            current_player = (player_tuple[0],  # Deep copy socket object
+                            player_tuple[1],  # Deep copy client address
+                            player_tuple[2])                 # Player name (no need to copy)
+            current_players.append(current_player)
+
+
         while len(current_players) >= 1:
             timer = time.time() #round is only 10 seconds
             problem, solution = get_random_question()

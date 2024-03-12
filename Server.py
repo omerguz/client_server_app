@@ -29,7 +29,6 @@ class Server:
         self.bufferSize = 1024 # Buffer size for socket communication
 
     def brodcastUdpOffer(self):    
-
         while self.udpflg==False:
             offerMessage = struct.pack("Ibh", 0xabcddcba, 0x2, self.hostPort)
             # brodacast the message to all clients connected to the net
@@ -37,6 +36,7 @@ class Server:
             # offerMessage, (modified_ip, self.udpBroadcastPort))
             offerMessage, ('<broadcast>', self.udpBroadcastPort))
             time.sleep(0.5)
+
 
     def waitForClient(self):
         '''
@@ -49,17 +49,22 @@ class Server:
         start_time = 0
         UdpBroadcastThread = threading.Thread(target=server.brodcastUdpOffer)
         UdpBroadcastThread.start()
-        while (len(self.playersTuple) >= 1 and time.time() - start_time < 10) or len(server.playersTuple) < 1:
-            self.TCPSocket.settimeout(10)
+        # TODO : Change timeouts
+        while (len(self.playersTuple) >= 1 and time.time() - start_time < 3) or len(server.playersTuple) < 1:
+        # while (len(self.playersTuple) >= 1 and time.time() - start_time < 10) or len(server.playersTuple) < 1:
+            self.TCPSocket.settimeout(0.5)
+            # self.TCPSocket.settimeout(10)
             try:
                 clientSocket, clientAddress = self.TCPSocket.accept()
-                self.udpflg=True
                 playerName = clientSocket.recv(self.bufferSize).decode("utf-8")
                 self.playersTuple.append((clientSocket, clientAddress, playerName))
                 if len(self.playersTuple) == 1:    # start the timer when the first client joins
                     start_time = time.time()
             except:
                 continue
+        self.udpflg = True
+        
+        
 
     def startGameMode(self, player, timer):
         start_time = time.time()
@@ -194,7 +199,8 @@ if __name__ == '__main__':
                 playerTuple[0].send(msg.encode("utf-8"))
             print(msg)
             msg = ""
-            server.solutionTuples = []
+            with server.lock:
+                server.solutionTuples = []
             for playerTuple in server.playersTuple:
                 pool.submit(server.startGameMode, playerTuple, timer)
             
@@ -213,14 +219,14 @@ if __name__ == '__main__':
                     else:
                         msg += f"{s[1]} is incorrect!\n"
 
-                #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
-                current_players = remove_wrong_answer_players(current_players, server.solutionTuples, solution)
-                #report of all incorrect\correct players
-                for playerTuple in server.playersTuple:
-                    playerTuple[0].send(msg.encode("utf-8"))
-                print(msg)
-                msg = "Congratulations to the winner: "    
-                if(len(current_players) == 1):
+            #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
+            current_players = remove_wrong_answer_players(current_players, server.solutionTuples, solution)
+            #report of all incorrect\correct players
+            for playerTuple in server.playersTuple:
+                playerTuple[0].send(msg.encode("utf-8"))
+            print(msg)
+            msg = "Congratulations to the winner: "    
+            if(len(current_players) == 1):
                     msg += f"{current_players[0][2]}"
                     for playerTuple in server.playersTuple:
                         playerTuple[0].send(msg.encode("utf-8"))

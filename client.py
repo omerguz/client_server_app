@@ -26,15 +26,22 @@ class Client:
             # Generate debug response when in debug mode
             data = "Choose to random question a random answer"
         else:
-            data = socket.recv(BUFFER_SIZE).decode("utf-8")
-        return data
+            try:
+                data = socket.recv(BUFFER_SIZE).decode("utf-8")
+                return data
+            except Exception as e:
+                print(f"Error receiving data from socket: {e}")
+                return None
 
     # Wrapper function for sending data to the server
     def sendData(self,socket, data):
         if self.DEBUG_MODE:
             print("Send message : ",data)
         else:
-            socket.send(data.encode("utf-8"))
+            try:
+                socket.send(data.encode("utf-8"))
+            except Exception as e:
+                print(f"Error sending data to socket: {e}")
 
     def udpRecvData(self, socket):
         data = None
@@ -73,14 +80,23 @@ class Client:
             try:
                 # data, addr = udp_socket.recvfrom(BUFFER_SIZE)
                 data, addr = self.udpRecvData(udp_socket)
-                msgUnPack = struct.unpack("Ibh", data)
+                string_length = len(data) - struct.calcsize("Ibh")
+
+                # Create the unpacking format string
+                unpack_format = f"Ibh{string_length}s"
+
+                # Unpack the offerMessage
+                msgUnPack = struct.unpack(unpack_format, data)
+                # msgUnPack = struct.unpack("Ibh", data)
                 cookie_int = int.from_bytes(self.MAGIC_COOKIE, byteorder='big')
                 magicCookieValid = msgUnPack[0] == cookie_int
                 msgTypeOfferValid = msgUnPack[1] == self.MESSAGE_TYPE_OFFER[0]
                 if magicCookieValid and msgTypeOfferValid:
                     offerMsgArrived = True
                     msgAndAddr = msgUnPack[2], addr
-
+                    server_info_string = msgUnPack[3].decode('utf-8')
+                    print(f"Received offer from server \"{server_info_string}\" at address {addr[0]}, attempting to connect...")
+                
             except Exception as e:
                 print(f"Error receiving offer message: {e}")
 
@@ -91,7 +107,6 @@ class Client:
         while True:
             print("Client started, listening for offer requests...")
             server_port_tcp, server_addr = self.getServerConnection()
-            # TODO : implement the name from terminal
             USER_NAME = None
             if not self.BOT_MODE:
                 print("Hello client! Enter your name : ")
@@ -104,8 +119,11 @@ class Client:
                 # Connect to the server over TCP
                 client_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 if(not self.DEBUG_MODE):
-                    client_tcp_socket.connect((server_addr[0], server_port_tcp))
-                    print("Connected to the server over TCP.")
+                    try:
+                        client_tcp_socket.connect((server_addr[0], server_port_tcp))
+                        print("Connected to the server over TCP.")
+                    except Exception as e:
+                        print(f"Error connecting to the server over TCP: {e}")
 
                 # Send team name to the server
                 self.sendData(client_tcp_socket, f"{USER_NAME}")
@@ -127,9 +145,6 @@ class Client:
     # Function to handle game mode
     def handle_game_mode(self, client_tcp_socket):
         try:
-            # Receive welcome message from the server
-            welcome_message = self.recvData(client_tcp_socket)
-            print(welcome_message)
             # Receive and print trivia questions, and send answers
             while True:
                 msg = self.recvData(client_tcp_socket)
@@ -137,18 +152,21 @@ class Client:
                 if msg.startswith("Congratulations"):
                     print(msg)
                     break
-
-                print(msg)
-                user_input_aswer = self.get_input_from_user()
-                answer = validAnswer(user_input_aswer)
-                if answer is not None:
-                    self.sendData(client_tcp_socket, answer)
-                else:
-                    print("Invalid input")
-                    # TODO : Check if need to while and break
-                
-                results_msg = self.recvData(client_tcp_socket)
-                print(results_msg)
+                elif msg.startswith("Round"):
+                    print(msg)
+                    attempts_left = 3
+                    while attempts_left > 0:
+                        user_input_answer = self.get_input_from_user()
+                        answer = validAnswer(user_input_answer)
+                        if answer is not None:
+                            self.sendData(client_tcp_socket, answer)
+                            break
+                        else:
+                            print("Invalid input, enter your answer again\n")
+                            attempts_left -= 1
+                            print(f"Attempts left: {attempts_left}\n")
+                else:                  
+                    print(msg)
 
         except Exception as e:
             print(f"Error in game mode: {e}")

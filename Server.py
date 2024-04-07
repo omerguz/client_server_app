@@ -244,6 +244,8 @@ class Server:
                     msg = "Congratulations to the winner: "    
                     if(len(current_players) == 1):
                             msg += f"{current_players[0].playerName}\n"
+                            msg += "Here some statistics about this game:\n"
+                            msg += get_longest_player_name(self)
                             self.send_message_to_clients(msg)
                             msg = "Game over, sending out offer requests..." 
                             print(msg)
@@ -258,7 +260,23 @@ class Server:
                 print(f"Error : {e}\n Starting game again..\n")
  
 
+def get_longest_player_name(self):
+    longest_names = []  # Initialize with an empty list
+    max_length = 0  # Initialize max_length to track the length of the longest name
 
+    for player in self.playersData:
+        # Check if the length of the player's name is longer than the current longest length
+        if len(player.playerName) > max_length:
+            max_length = len(player.playerName)
+            longest_names = [player.playerName]  # Reset the list with the new longest name
+        elif len(player.playerName) == max_length:
+            longest_names.append(player.playerName)  # Add to the list if name length is same as longest
+        longest_names_str = ""
+        for name in longest_names:
+            longest_names_str += f"{name}, "
+        longest_names_str = longest_names_str[:-2]  # Remove the trailing comma and space
+    return f"The player(s) with the longest name(s) are: {longest_names_str}"    
+    
 def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
     # Get the names of players who gave the wrong answer    
     wrong_answer_players = {player_name for solution, player_name in solutionTuples if solution != correct_answer}

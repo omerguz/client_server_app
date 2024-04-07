@@ -62,9 +62,10 @@ class Server:
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
         self.playersData = [] # Stores information about players (socket, address, name)
-        self.current_players=[]
+        self.current_players = []
         self.solutionTuples = [] # Stores solutions submitted by players (solution, player_name)
-        self.lock = threading.Lock() # Lock for thread safety
+        self.solutionTupleLock = threading.Lock() # Lock for thread safety
+        self.playerDataLock = threading.Lock() # Lock for thread safety
         self.udpflg = False # Flag for UDP broadcast
         self.udpBroadcastPort = 13117 # UDP broadcast port
         self.gemeEndTime = 10 # Game end time in seconds
@@ -120,8 +121,7 @@ class Server:
         start_time = 0
         UdpBroadcastThread = threading.Thread(target=self.brodcastUdpOffer)
         UdpBroadcastThread.start()
-        # TODO : Change timeouts
-        # while (len(self.playersData) >= 1 and time.time() - start_time < 3) or len(self.playersData) < 1:
+
         while (len(self.playersData) >= 1 and time.time() - start_time < 10) or len(self.playersData) < 1:
             # self.TCPSocket.settimeout(0.5)
             self.TCPSocket.settimeout(10)
@@ -136,12 +136,15 @@ class Server:
         self.udpflg = True
         
     def removePlayerFromGame(self,player: Player):
-        player.clientSocket.close()
-        # Remove the player from playerData
-        self.playersData = [p for p in self.playersData if p.playerName != player.playerName]
-    
-        # Remove the player from current_players
-        self.current_players = [p for p in self.current_players  if p.playerName != player.playerName]    
+        try:
+            player.clientSocket.close()
+        except Exception as e:
+            print_with_color("Client socket already closed\n")
+            # Remove the player from playerData
+            self.playersData = [p for p in self.playersData if p.playerName != player.playerName]
+        
+            # Remove the player from current_players
+            self.current_players = [p for p in self.current_players  if p.playerName != player.playerName]    
 
     def startGameMode(self, player:Player, timer):
         start_time = time.time()
@@ -154,7 +157,7 @@ class Server:
                 userSolution = player.clientSocket.recv(self.bufferSize).decode("utf-8")
                 
                 # Append the solution to the list of solution tuples
-                with self.lock:
+                with self.solutionTupleLock:
                     self.solutionTuples.append((userSolution, player.playerName))
                     break
             
@@ -163,10 +166,9 @@ class Server:
                 pass
             except Exception as e:
                 # Handle other exceptions
-                if isinstance(e, socket.error) and e.errno == 10054:
+                with self.playerDataLock:
                     self.removePlayerFromGame(player)
-                    print_with_color(f"The user {player.playerName} was disconnected successfully.", ANSI_RED)
-                else: print_with_color(f"Error in startGameMode: {e}", ANSI_RED)
+                    print_with_color(f"The user {player.playerName} was disconnected.", ANSI_RED)
                 break
  
     def getPlayersNames(self):
@@ -179,22 +181,22 @@ class Server:
         # Remove the trailing comma and space
         return player_names
 
-    def get_currect_players(self):
-        current_players = []
+    def get_current_players(self):
+        self.current_players = []
         for player_tuple in self.playersData:
             current_player = (Player(
                 player_tuple.clientSocket,  # Deep copy socket object
                 player_tuple.clientAddress,  # Deep copy client address
                 player_tuple.playerName  # Player name (no need to copy)
             ))
-            current_players.append(current_player)
-        return current_players
+            self.current_players.append(current_player)
 
     def getPlayersAnswerMsg(self):
         players_answers_msg = "The number of correct answers for each player is:\n"
+        sorted_players_answers = dict(sorted(self.playersAnswersAmount.items(), key=lambda x: x[1], reverse=True))
 
         # Iterate over each player and accumulate their message
-        for player_name, answer_count in self.playersAnswersAmount.items():
+        for player_name, answer_count in sorted_players_answers.items():
             players_answers_msg += f"{player_name}: {answer_count}\n"
         
         return players_answers_msg
@@ -220,66 +222,72 @@ class Server:
                 counter = 0
                 pool =  concurrent.futures.ThreadPoolExecutor(len(self.playersData))
 
-                current_players = self.get_currect_players()
+                self.get_current_players()
 
-                while len(current_players) >= 1:
+                while len(self.current_players) >= 1:
                     timer = time.time() #round is only 10 seconds
                     problem = get_random_question(userIncides)
                     solution = problem[IS_TRUE]
                     counter += 1
                     
-                    msg = f"Round {counter}, played by " + format_names([playerData.playerName for playerData in current_players]) + f"\n==\nTrue or false : {problem[QUESTION]}\n"
+                    msg = f"Round {counter}, played by " + format_names([playerData.playerName for playerData in self.current_players]) + f"\n==\nTrue or false : {problem[QUESTION]}\n"
                     self.send_message_to_clients(msg)
                     msg = ""
 
-                    with self.lock:
+                    with self.solutionTupleLock:
                         self.solutionTuples.clear()
-                    for playerData in self.playersData:
+                    for playerData in self.current_players:
                         pool.submit(self.startGameMode, playerData, timer)
                     
                     start_time = time.time()
                     while time.time() - start_time < 10:
-                        with self.lock:
+                        with self.solutionTupleLock:
                             if(len(self.solutionTuples) == len(self.playersData)):
                                 break
                         time.sleep(0.5)  # Sleep for 0.5 second before rechecking
                     
-                    with self.lock:
+                    with self.solutionTupleLock:
                         for i, s in enumerate(self.solutionTuples):
                             # remove the client from the game if it didn't answer in time\correctly
                             print_with_color(f"Server got answer : {s[0]}\n", ANSI_BLUE)
+                            value = self.playersAnswersAmount.get(s[1], 0)
+                            if value == 0:
+                                self.playersAnswersAmount[s[1]] = 0
                             if(s[0] == solution):
                                 msg += f"{s[1]} is correct!\n"
-                                self.playersAnswersAmount[s[1]] = self.playersAnswersAmount.get(s[1], 0) + 1
+                                self.playersAnswersAmount[s[1]] = value + 1
                             else:
                                 msg += f"{s[1]} is incorrect!\n"
                     
                     #report of all incorrect\correct players
                     self.send_message_to_clients(msg)
                     #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
-                    current_players = remove_wrong_answer_players(current_players, self.solutionTuples, solution)
+                    self.current_players = remove_wrong_answer_players(self.current_players, self.solutionTuples, solution)
                     
                     msg = "Congratulations to the winner: "    
-                    if(len(current_players) == 1):
-                            msg += f"{current_players[0].playerName}\n"
+                    if(len(self.current_players) == 1):
+                            msg += f"{self.current_players[0].playerName}\n"
                             msg += "Here some statistics about this game:\n"
                             msg += get_longest_player_name(self)
+                            msg += self.getPlayersAnswerMsg()
                             self.send_message_to_clients(msg)
                             self.playersAnswersAmount = {}
                             msg = "Game over, sending out offer requests..." 
                             print_with_color(msg, ANSI_YELLOW)
                             break
                 
+                pool.shutdown(wait = False)
+                
+                # with self.playerDataLock(self.playersData):
                 for playerData in self.playersData:
                     try:
-                        playerData.clientSocket.close()
+                        if not playerData.clientSocket._closed:
+                            playerData.clientSocket.close()
                     except:
                         continue
-            except Exception as e:
-                print_with_color(f"Error : {e}\n Starting game again..\n", ANSI_RED)
 
-                print(f"Error : {e}\n Starting game again..\n")
- 
+            except Exception as e:
+                print_with_color(f"Error : {e}\n Starting game again..\n", ANSI_RED) 
 
 def get_longest_player_name(self):
     longest_names = []  # Initialize with an empty list

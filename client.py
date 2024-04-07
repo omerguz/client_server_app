@@ -106,14 +106,15 @@ class Client:
         # Listen for offer messages
         while True:
             print("Client started, listening for offer requests...")
+            self.PLAYER_IS_ACTIVE = True
             server_port_tcp, server_addr = self.getServerConnection()
-            USER_NAME = None
+            self.user_name = None
             if not self.BOT_MODE:
                 print("Hello client! Enter your name : ")
-                USER_NAME = input().strip()
+                self.user_name = input().strip()
             else:
-                USER_NAME = "BOT_" + f"{self.id}"
-                print(f"I'm a BOT ! My name is : {USER_NAME}")
+                self.user_name = "BOT_" + f"{self.id}"
+                print(f"I'm a BOT ! My name is : {self.user_name}\n")
             # Process offer message and extract server information
             if server_port_tcp:
                 # Connect to the server over TCP
@@ -126,7 +127,7 @@ class Client:
                         print(f"Error connecting to the server over TCP: {e}")
 
                 # Send team name to the server
-                self.sendData(client_tcp_socket, f"{USER_NAME}")
+                self.sendData(client_tcp_socket, f"{self.user_name}")
 
                 # Enter game mode
                 self.handle_game_mode(client_tcp_socket)  
@@ -134,10 +135,10 @@ class Client:
     def get_input_from_user(self):
         if self.BOT_MODE:
             if random.random() > 0.5:
-                print("BOT CHOOSES VALUE Y")
+                print(f"{self.user_name} Choose value Y\n")
                 return "Y"
             else:
-                print("BOT CHOOSES VALUE F")
+                print(f"{self.user_name} Choose value F\n")
                 return "F"
         else:
             return input("Enter your answer (Y/T/1 for True or N/F/0 for False): ")      
@@ -148,25 +149,24 @@ class Client:
             # Receive and print trivia questions, and send answers
             while True:
                 msg = self.recvData(client_tcp_socket)
-
+                print(msg)
                 if msg.startswith("Congratulations"):
-                    print(msg)
                     break
+                elif f"{self.user_name} is incorrect" in msg:
+                    self.PLAYER_IS_ACTIVE = False 
                 elif msg.startswith("Round"):
-                    print(msg)
-                    attempts_left = 3
-                    while attempts_left > 0:
-                        user_input_answer = self.get_input_from_user()
-                        answer = validAnswer(user_input_answer)
-                        if answer is not None:
-                            self.sendData(client_tcp_socket, answer)
-                            break
-                        else:
-                            print("Invalid input, enter your answer again\n")
-                            attempts_left -= 1
-                            print(f"Attempts left: {attempts_left}\n")
-                else:                  
-                    print(msg)
+                    if(self.PLAYER_IS_ACTIVE):
+                        attempts_left = 3
+                        while attempts_left > 0:
+                            user_input_answer = self.get_input_from_user()
+                            answer = validAnswer(user_input_answer)
+                            if answer is not None:
+                                self.sendData(client_tcp_socket, answer)
+                                break
+                            else:
+                                print("Invalid input, enter your answer again\n")
+                                attempts_left -= 1
+                                print(f"Attempts left: {attempts_left}\n")
 
         except Exception as e:
             print(f"Error in game mode: {e}")
@@ -190,7 +190,7 @@ def extract_args():
     bot_size = 0
 
     args = sys.argv[1:]  # Exclude the script name itself
-
+    print(args)
     # Check for -d flag
     if '-d' in args:
         debug_mode = True
@@ -217,6 +217,7 @@ def extract_args():
 
 if __name__ == "__main__":
     debug_mode, bot_mode, bot_size = extract_args()
+
     defaultIndex = 0
     # Create clients with different buffer sizes in separate threads
     if bot_size > 1:

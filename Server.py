@@ -235,7 +235,7 @@ class Server:
                     
                     msg = "Congratulations to the winner: "    
                     if(len(current_players) == 1):
-                            msg += f"{current_players[0].playerName}"
+                            msg += f"{current_players[0].playerName}\n"
                             self.send_message_to_clients(msg)
                             msg = "Game over, sending out offer requests..." 
                             print(msg)

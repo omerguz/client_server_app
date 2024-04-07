@@ -10,8 +10,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/client.py",  // Replace 'client.py' with the path to your Python file
-            "console": "integratedTerminal",
-            "args": ["-s", "1"]
+            "args": ["-b", "-s", "10"],
+            "console": "integratedTerminal"
         }
     ]
 }

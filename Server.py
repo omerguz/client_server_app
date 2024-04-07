@@ -57,13 +57,14 @@ class Server:
         self.hostIP = socket.gethostbyname(self.hostName)
         self.hostPort = 2009
         self.playersData = [] # Stores information about players (socket, address, name)
+        self.current_players=[]
         self.solutionTuples = [] # Stores solutions submitted by players (solution, player_name)
         self.lock = threading.Lock() # Lock for thread safety
         self.udpflg = False # Flag for UDP broadcast
         self.udpBroadcastPort = 13117 # UDP broadcast port
         self.gemeEndTime = 10 # Game end time in seconds
         self.bufferSize = 1024 # Buffer size for socket communication
-
+        
     def init_tcp_socket(self):
         con = False
         while not con:
@@ -127,9 +128,14 @@ class Server:
                 continue
         self.udpflg = True
         
-        
+    def removePlayerFromGame(self,player: Player):
+        # Remove the player from playerData
+        self.playersData = [p for p in self.playersData if p.playerName != player.playerName]
+    
+        # Remove the player from current_players
+        self.current_players = [p for p in self.current_players  if p.playerName != player.playerName]    
 
-    def startGameMode(self, player, timer):
+    def startGameMode(self, player:Player, timer):
         start_time = time.time()
         while time.time() - start_time < 10:  # Ensure the loop runs for a maximum of 10 seconds
             try:
@@ -149,7 +155,10 @@ class Server:
                 pass
             except Exception as e:
                 # Handle other exceptions
-                print(f"Error in startGameMode: {e}")
+                if isinstance(e, socket.error) and e.errno == 10054:
+                    self.removePlayerFromGame(player)
+                    print(f"The user {player.playerName} was disconnected successfully.")
+                else: print(f"Error in startGameMode: {e}")
                 break
  
     def getPlayersNames(self):

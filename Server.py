@@ -17,7 +17,6 @@ BUFFER_SIZE = 1024
 MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
 MESSAGE_TYPE_OFFER = b'\x02'
 SERVER_NAME = "MillionDollarTRIVIA"
-IP_ADDR = "172.4.0.1"
 Player = namedtuple('Player', ['clientSocket', 'clientAddress', 'playerName'])
 QUESTION = "question"
 IS_TRUE = "is_true"

@@ -4,7 +4,7 @@ import struct
 import threading
 import time
 import sys
-# ANSI color codes for better 
+
 ANSI_YELLOW = "\033[33m"
 ANSI_RESET = "\033[0m"
 ANSI_GREEN = "\033[32m"
@@ -21,7 +21,6 @@ class Client:
         self.id = index
         self.SERVER_PORT = 13117
         self.BOT_SIZE = bot_size
-        # self.IP_ADDRESS = "172.1.0.4"
         self.MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
         self.MESSAGE_TYPE_OFFER = b'\x02'
         self.SERVER_PORT_TCP_INDEX = 36
@@ -45,7 +44,7 @@ class Client:
     # Wrapper function for sending data to the server
     def sendData(self,socket, data):
         if self.DEBUG_MODE:
-            self.print_with_color(f"Send message : {data}", ANSI_BLUE)
+            self.print_with_color(f"Send message : {data}", ANSI_GREEN)
         else:
             try:
                 socket.send(data.encode("utf-8"))
@@ -72,7 +71,7 @@ class Client:
                 data = client_socket.recv(BUFFER_SIZE)
                 if not data:
                     break
-                self.print_with_color(data.decode("utf-8"), ANSI_GREEN)
+                self.print_with_color(data.decode("utf-8"), ANSI_BLUE)
             except Exception as e:
                 self.print_with_color(f"Error receiving data from server: {e}", ANSI_RED)
                 break
@@ -162,7 +161,7 @@ class Client:
                 self.print_with_color(msg, ANSI_BLUE)
                 if msg.startswith("Congratulations"):
                     break
-                elif f"{self.user_name} is incorrect" in msg:
+                elif f"{self.user_name} is incorrect" in msg and " correct" in msg:
                     self.PLAYER_IS_ACTIVE = False 
                 elif msg.startswith("Round"):
                     if(self.PLAYER_IS_ACTIVE):

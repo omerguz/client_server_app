@@ -8,9 +8,12 @@ import random
 import copy
 from collections import namedtuple
 
-# from termcolor import colored
+ANSI_YELLOW = "\033[33m" # Start
+ANSI_RESET = "\033[0m" 
+ANSI_GREEN = "\033[32m" # 
+ANSI_RED = "\033[31m"
+ANSI_BLUE = "\033[34m"
 
-# TODO : Use enum instead of self. ...
 UDP_PORT = 13117
 TCP_PORT = 12345  # Replace with any available port on your machine
 BUFFER_SIZE = 1024
@@ -44,6 +47,8 @@ TRIVIA_QUESTIONS = [
 ]
 
 
+def print_with_color(message, color):
+        print(color + message + ANSI_RESET)
 
 class Server:
     def __init__(self):
@@ -64,7 +69,9 @@ class Server:
         self.udpBroadcastPort = 13117 # UDP broadcast port
         self.gemeEndTime = 10 # Game end time in seconds
         self.bufferSize = 1024 # Buffer size for socket communication
-        
+        self.playersAnswersAmount = {}
+
+            
     def init_tcp_socket(self):
         con = False
         while not con:
@@ -80,16 +87,16 @@ class Server:
         Send a message to all connected clients.
         If an exception occurs while sending the message to a client, remove that client from the list.
         """
-        print(msg)
+        print_with_color(msg, ANSI_GREEN)
         updated_players_data = []
         for player_data in self.playersData:
             try:
                 player_data.clientSocket.send(msg.encode("utf-8"))
                 updated_players_data.append(player_data)
             except Exception as e:
-                print(f"Error sending message to {player_data.playerName}: {e}. Removing from the list.")
+                print_with_color(f"Error sending message to {player_data.playerName}: {e}. Removing from the list.", ANSI_RED)
         self.playersData = updated_players_data
-
+       
     def brodcastUdpOffer(self):    
         while self.udpflg==False:
             SERVER_NAME_BYTES = SERVER_NAME.encode('utf-8')
@@ -129,6 +136,7 @@ class Server:
         self.udpflg = True
         
     def removePlayerFromGame(self,player: Player):
+        player.clientSocket.close()
         # Remove the player from playerData
         self.playersData = [p for p in self.playersData if p.playerName != player.playerName]
     
@@ -157,8 +165,8 @@ class Server:
                 # Handle other exceptions
                 if isinstance(e, socket.error) and e.errno == 10054:
                     self.removePlayerFromGame(player)
-                    print(f"The user {player.playerName} was disconnected successfully.")
-                else: print(f"Error in startGameMode: {e}")
+                    print_with_color(f"The user {player.playerName} was disconnected successfully.", ANSI_RED)
+                else: print_with_color(f"Error in startGameMode: {e}", ANSI_RED)
                 break
  
     def getPlayersNames(self):
@@ -182,6 +190,15 @@ class Server:
             current_players.append(current_player)
         return current_players
 
+    def getPlayersAnswerMsg(self):
+        players_answers_msg = "The number of correct answers for each player is:\n"
+
+        # Iterate over each player and accumulate their message
+        for player_name, answer_count in self.playersAnswersAmount.items():
+            players_answers_msg += f"{player_name}: {answer_count}\n"
+        
+        return players_answers_msg
+    
     def run_trivia_game(self):
         while True:
             self.playersData = []
@@ -189,7 +206,7 @@ class Server:
             self.udpflg = False
             userIncides = []
             # Print start message
-            print(f"Server started, listening on IP address {self.hostIP}")
+            print_with_color(f"Server started, listening on IP address {self.hostIP}", ANSI_YELLOW)
             # Start wait for clients stage
             try:
                 self.waitForClient()
@@ -230,9 +247,10 @@ class Server:
                     with self.lock:
                         for i, s in enumerate(self.solutionTuples):
                             # remove the client from the game if it didn't answer in time\correctly
-                            print(f"Server got answer : {s[0]}\n")
+                            print_with_color(f"Server got answer : {s[0]}\n", ANSI_BLUE)
                             if(s[0] == solution):
                                 msg += f"{s[1]} is correct!\n"
+                                self.playersAnswersAmount[s[1]] = self.playersAnswersAmount.get(s[1], 0) + 1
                             else:
                                 msg += f"{s[1]} is incorrect!\n"
                     
@@ -245,8 +263,9 @@ class Server:
                     if(len(current_players) == 1):
                             msg += f"{current_players[0].playerName}\n"
                             self.send_message_to_clients(msg)
+                            self.playersAnswersAmount = {}
                             msg = "Game over, sending out offer requests..." 
-                            print(msg)
+                            print_with_color(msg, ANSI_YELLOW)
                             break
                 
                 for playerData in self.playersData:
@@ -255,9 +274,7 @@ class Server:
                     except:
                         continue
             except Exception as e:
-                print(f"Error : {e}\n Starting game again..\n")
- 
-
+                print_with_color(f"Error : {e}\n Starting game again..\n", ANSI_RED)
 
 def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
     # Get the names of players who gave the wrong answer    
@@ -276,7 +293,7 @@ def remove_wrong_answer_players(current_players, solutionTuples, correct_answer)
 
 def get_random_question(used_indices):
     if len(used_indices) == len(TRIVIA_QUESTIONS):
-            print("No more questions left, start again...")
+            print_with_color("No more questions left, start again...", ANSI_YELLOW)
             used_indices.clear()
     while True:
         question_index = random.randint(0, len(TRIVIA_QUESTIONS) - 1)
@@ -296,7 +313,7 @@ def test_trivia():
     userIncides = []
     while True:
         problem = get_random_question(userIncides)
-        print(userIncides)
+        print_with_color(userIncides, ANSI_GREEN)
         solution = problem[IS_TRUE]
 
 # Game Flow

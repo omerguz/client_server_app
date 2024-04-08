@@ -162,6 +162,9 @@ class Client:
                 msg = self.recvData(client_tcp_socket)
                 if msg == None:
                     print_with_color("Received an empty message, wait for another message", ANSI_GREEN)
+                    if client_tcp_socket.close:
+                        print_with_color("Socket is closed", ANSI_GREEN)
+                        client_tcp_socket.close()
                 else:
                     print_with_color(msg, ANSI_BLUE)
                     if msg.startswith("Congratulations"):

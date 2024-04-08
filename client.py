@@ -13,6 +13,9 @@ ANSI_BLUE = "\033[34m"
 
 BUFFER_SIZE = 1024
 
+def print_with_color(message, color):
+        print(color + message + ANSI_RESET)
+
 class Client:
     def __init__(self, index, debug_mode=False, bot_mode=False, bot_size=None):
         self.DEBUG_MODE = debug_mode
@@ -25,31 +28,25 @@ class Client:
         self.MESSAGE_TYPE_OFFER = b'\x02'
         self.SERVER_PORT_TCP_INDEX = 36
 
-    def print_with_color(self, message, color):
-        print(color + message + ANSI_RESET)
-
     def recvData(self, socket):
         data = None
         if self.DEBUG_MODE:
             # Generate debug response when in debug mode
             data = "Choose to random question a random answer"
         else:
-            try:
-                data = socket.recv(BUFFER_SIZE).decode("utf-8")
+            # try:
+            data = socket.recv(BUFFER_SIZE).decode("utf-8")
+            if len(data) > 0:
                 return data
-            except Exception as e:
-                self.print_with_color(f"Error receiving data from socket: {e}", ANSI_RED)
-                return None
+            else: 
+                return None 
 
     # Wrapper function for sending data to the server
     def sendData(self,socket, data):
         if self.DEBUG_MODE:
-            self.print_with_color(f"Send message : {data}", ANSI_GREEN)
+            print_with_color(f"Send message : {data}", ANSI_GREEN)
         else:
-            try:
-                socket.send(data.encode("utf-8"))
-            except Exception as e:
-                self.print_with_color(f"Error sending data to socket: {e}", ANSI_RED)
+            socket.send(data.encode("utf-8"))
 
     def udpRecvData(self, socket):
         data = None
@@ -61,7 +58,6 @@ class Client:
             data = b'\xba\xdc\xcd\xab\x02\x00\xd9\x07'
         else:
             data, addr = socket.recvfrom(BUFFER_SIZE)
-
         return data, addr
 
     # Function to handle receiving data from the server
@@ -71,9 +67,9 @@ class Client:
                 data = client_socket.recv(BUFFER_SIZE)
                 if not data:
                     break
-                self.print_with_color(data.decode("utf-8"), ANSI_BLUE)
+                print_with_color(data.decode("utf-8"), ANSI_BLUE)
             except Exception as e:
-                self.print_with_color(f"Error receiving data from server: {e}", ANSI_RED)
+                print_with_color(f"Error receiving data from server: {e}", ANSI_RED)
                 break
 
     def getServerConnection(self):
@@ -104,26 +100,27 @@ class Client:
                     offerMsgArrived = True
                     msgAndAddr = msgUnPack[2], addr
                     server_info_string = msgUnPack[3].decode('utf-8')
-                    self.print_with_color(f"Received offer from server \"{server_info_string}\" at address {addr[0]}, attempting to connect...",ANSI_YELLOW)
+                    print_with_color(f"Received offer from server \"{server_info_string}\" at address {addr[0]}, attempting to connect...",ANSI_YELLOW)
                 
             except Exception as e:
-                self.print_with_color(f"Error receiving offer message: {e}", ANSI_RED)
+                print_with_color(f"Error receiving offer message: {e}", ANSI_RED)
 
         return msgAndAddr   
 
     def run_client(self):
         # Listen for offer messages
         while True:
-            self.print_with_color("Client started, listening for offer requests...", ANSI_GREEN)
+            print_with_color("Client started, listening for offer requests...", ANSI_GREEN)
             self.PLAYER_IS_ACTIVE = True
             server_port_tcp, server_addr = self.getServerConnection()
+
             self.user_name = None
             if not self.BOT_MODE:
-                self.print_with_color("Hello client! Enter your name : ", ANSI_GREEN)
+                print_with_color("Hello client! Enter your name : ", ANSI_GREEN)
                 self.user_name = input().strip()
             else:
                 self.user_name = "BOT_" + f"{self.id}"
-                self.print_with_color(f"I'm a BOT ! My name is : {self.user_name}\n", ANSI_GREEN)
+                print_with_color(f"I'm a BOT ! My name is : {self.user_name}", ANSI_GREEN)
             # Process offer message and extract server information
             if server_port_tcp:
                 # Connect to the server over TCP
@@ -131,12 +128,17 @@ class Client:
                 if(not self.DEBUG_MODE):
                     try:
                         client_tcp_socket.connect((server_addr[0], server_port_tcp))
-                        self.print_with_color("Connected to the server over TCP.", ANSI_GREEN)
+                        print_with_color("Connected to the server over TCP.", ANSI_GREEN)
                     except Exception as e:
-                        self.print_with_color(f"Error connecting to the server over TCP: {e}",ANSI_RED)
+                        print_with_color(f"Error connecting to the server over TCP: {e}",ANSI_RED)
+                        continue
 
                 # Send team name to the server
-                self.sendData(client_tcp_socket, f"{self.user_name}")
+                try:
+                    self.sendData(client_tcp_socket, f"{self.user_name}")
+                except Exception as e:
+                    print_with_color(f"Error sending team name to the server over TCP: {e}",ANSI_RED)
+                    continue
 
                 # Enter game mode
                 self.handle_game_mode(client_tcp_socket)  
@@ -144,7 +146,7 @@ class Client:
     def get_input_from_user(self):
         if self.BOT_MODE:
             if random.random() > 0.5:
-                self.print_with_color(f"{self.user_name} Choose value Y\n",ANSI_GREEN)
+                print_with_color(f"{self.user_name} Choose value Y\n",ANSI_GREEN)
                 return "Y"
             else:
                 print(f"{self.user_name} Choose value F\n", ANSI_GREEN)
@@ -158,27 +160,30 @@ class Client:
             # Receive and print trivia questions, and send answers
             while True:
                 msg = self.recvData(client_tcp_socket)
-                self.print_with_color(msg, ANSI_BLUE)
-                if msg.startswith("Congratulations"):
-                    break
-                elif f"{self.user_name} is incorrect" in msg and " correct" in msg:
-                    self.PLAYER_IS_ACTIVE = False 
-                elif msg.startswith("Round"):
-                    if(self.PLAYER_IS_ACTIVE):
-                        attempts_left = 3
-                        while attempts_left > 0:
-                            user_input_answer = self.get_input_from_user()
-                            answer = validAnswer(user_input_answer)
-                            if answer is not None:
-                                self.sendData(client_tcp_socket, answer)
-                                break
-                            else:
-                                self.print_with_color("Invalid input, enter your answer again\n", ANSI_GREEN)
-                                attempts_left -= 1
-                                self.print_with_color(f"Attempts left: {attempts_left}\n", ANSI_GREEN)
+                if msg == None:
+                    print_with_color("Received an empty message, wait for another message", ANSI_GREEN)
+                else:
+                    print_with_color(msg, ANSI_BLUE)
+                    if msg.startswith("Congratulations"):
+                        break
+                    elif f"{self.user_name} is incorrect" in msg and " correct" in msg:
+                        self.PLAYER_IS_ACTIVE = False 
+                    elif msg.startswith("Round"):
+                        if(self.PLAYER_IS_ACTIVE):
+                            attempts_left = 3
+                            while attempts_left > 0:
+                                user_input_answer = self.get_input_from_user()
+                                answer = validAnswer(user_input_answer)
+                                if answer is not None:
+                                    self.sendData(client_tcp_socket, answer)
+                                    break
+                                else:
+                                    print_with_color("Invalid input, enter your answer again\n", ANSI_GREEN)
+                                    attempts_left -= 1
+                                    print_with_color(f"Attempts left: {attempts_left}\n", ANSI_GREEN)
 
         except Exception as e:
-            self.print_with_color(f"Error in game mode: {e}", ANSI_RED)
+            print_with_color(f"Error in game mode: {e}", ANSI_RED)
         finally:
             client_tcp_socket.close()
 

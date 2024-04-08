@@ -123,7 +123,6 @@ class Server:
         UdpBroadcastThread.start()
 
         while (len(self.playersData) >= 1 and time.time() - start_time < 10) or len(self.playersData) < 1:
-            # self.TCPSocket.settimeout(0.5)
             self.TCPSocket.settimeout(10)
             try:
                 clientSocket, clientAddress = self.TCPSocket.accept()
@@ -131,8 +130,14 @@ class Server:
                 self.playersData.append(Player(clientSocket, clientAddress, playerName))
                 if len(self.playersData) == 1:    # start the timer when the first client joins
                     start_time = time.time()
-            except:
-                continue
+            except socket.timeout:
+                # Timeout occurred, do nothing and continue
+                pass
+            except Exception as e:
+                    print_with_color(f"Error at open a TCP socket for a: {e}",ANSI_RED)
+                    if not clientSocket.close:
+                        clientSocket.close()  # Close the socket if it's open
+                    continue
         self.udpflg = True
         
     def removePlayerFromGame(self,player: Player):
@@ -220,6 +225,7 @@ class Server:
                 self.send_message_to_clients(welcomeMsg)
                 
                 counter = 0
+                
                 pool =  concurrent.futures.ThreadPoolExecutor(len(self.playersData))
 
                 self.get_current_players()

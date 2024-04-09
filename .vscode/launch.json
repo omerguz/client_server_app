@@ -19,7 +19,7 @@
             "args": [
                 "-b",
                 "-s",
-                "10"
+                "2"
             ],
             "console": "integratedTerminal"
         }

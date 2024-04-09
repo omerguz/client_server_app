@@ -7,6 +7,7 @@ from concurrent.futures import thread
 import random
 import copy
 from collections import namedtuple
+import socket
 
 ANSI_YELLOW = "\033[33m" # Start
 ANSI_RESET = "\033[0m" 
@@ -53,9 +54,12 @@ def print_with_color(message, color):
 class Server:
     def __init__(self):
         # initialize UDP socket
+        self.udpBroadcastPort = 13117 # UDP broadcast port
         self.UDPSocket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.UDPSocket.bind(('', self.udpBroadcastPort))
         # initialize TCP socket
         self.TCPSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.hostName = socket.gethostname()
@@ -67,7 +71,6 @@ class Server:
         self.solutionTupleLock = threading.Lock() # Lock for thread safety
         self.playerDataLock = threading.Lock() # Lock for thread safety
         self.udpflg = False # Flag for UDP broadcast
-        self.udpBroadcastPort = 13117 # UDP broadcast port
         self.gemeEndTime = 10 # Game end time in seconds
         self.bufferSize = 1024 # Buffer size for socket communication
         self.playersAnswersAmount = {}
@@ -102,22 +105,16 @@ class Server:
         while self.udpflg==False:
             SERVER_NAME_BYTES = SERVER_NAME.encode('utf-8')
             offerMessage = struct.pack(f"Ibh{len(SERVER_NAME_BYTES)}s", 0xabcddcba, 0x2, self.hostPort, SERVER_NAME_BYTES)
+            broadcast_address = get_wifi_ip_and_broadcast()
 
-            # brodacast the message to all clients connected to the net
-            self.UDPSocket.sendto(
+            self.UDPSocket.sendto(offerMessage, (broadcast_address, self.udpBroadcastPort))
+            # self.UDPSocket.sendto(offerMessage, ('<broadcast>', self.udpBroadcastPort))
             # offerMessage, (modified_ip, self.udpBroadcastPort))
-            offerMessage, ('<broadcast>', self.udpBroadcastPort))
+            
             time.sleep(0.5)
 
 
     def waitForClient(self):
-        '''
-        First stage of the server
-        The server start brodcast offers to the clients in the network via UDP 
-        while listning to join request from clients via TCP.
-        this function update the self.team with the first two teams that request to join
-        we leave this this stage when two clients joined the game.
-        '''
         start_time = 0
         UdpBroadcastThread = threading.Thread(target=self.brodcastUdpOffer)
         UdpBroadcastThread.start()
@@ -212,9 +209,7 @@ class Server:
             self.solutionTuples = []
             self.udpflg = False
             userIncides = []
-            # Print start message
             print_with_color(f"Server started, listening on IP address {self.hostIP}", ANSI_YELLOW)
-            # Start wait for clients stage
             try:
                 self.waitForClient()
 
@@ -248,7 +243,7 @@ class Server:
                     start_time = time.time()
                     while time.time() - start_time < 10:
                         with self.solutionTupleLock:
-                            if(len(self.solutionTuples) == len(self.playersData)):
+                            if(len(self.solutionTuples) == len(self.current_players)):
                                 break
                         time.sleep(0.5)  # Sleep for 0.5 second before rechecking
                     
@@ -351,6 +346,30 @@ def test_trivia():
         problem = get_random_question(userIncides)
         print_with_color(userIncides, ANSI_GREEN)
         solution = problem[IS_TRUE]
+
+
+def get_wifi_ip_and_broadcast():
+    # Create a UDP socket
+    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    try:
+        # Connect to an external server (doesn't actually send any data)
+        udp_socket.connect(("8.8.8.8", 80))
+        
+        # Get the local IP address associated with the socket
+        ip_address = udp_socket.getsockname()[0]
+        
+        # Extract the subnet address
+        subnet_address = '.'.join(ip_address.split('.')[:-1])
+        
+        # Construct the broadcast address
+        broadcast_address = f"{subnet_address}.255"
+        
+    finally:
+        # Close the socket to release resources
+        udp_socket.close()
+    
+    return broadcast_address
 
 # Game Flow
 if __name__ == '__main__':

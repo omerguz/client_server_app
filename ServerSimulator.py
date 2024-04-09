@@ -192,9 +192,9 @@ class Server:
                     continue
 
                 welcomeMsg = f"Welcome to the {SERVER_NAME} server, where we are answering trivia questions about English Premier League.\n{self.getPlayersNames()}"
-                for player in self.playersData:
-                    if not self.send_message_to_clients(welcomeMsg):
-                        remove player from self.playersData
+                # for player in self.playersData:
+                    # if not self.send_message_to_clients(welcomeMsg):
+                        # remove player from self.playersData
                         # TODO : do it in all of the places..
                 
 
@@ -299,9 +299,30 @@ def test_trivia():
         print(userIncides)
         solution = problem[IS_TRUE]
 
+def get_wifi_ip_address():
+    # Create a UDP socket
+    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    try:
+        # Connect to an external server (doesn't actually send any data)
+        udp_socket.connect(("8.8.8.8", 80))
+        
+        # Get the local IP address associated with the socket
+        ip_address = udp_socket.getsockname()[0]
+    finally:
+        # Close the socket to release resources
+        udp_socket.close()
+    
+    return ip_address
+
+# Call the function to get the IP address of the Wi-Fi interface
+wifi_ip_address = get_wifi_ip_address()
+
+print("Wi-Fi IP Address:", wifi_ip_address)
+
 # Game Flow
 if __name__ == '__main__':
     server = Server()
-    server.init_tcp_socket()
-    server.run_trivia_game()
+    # server.init_tcp_socket()
+    # server.run_trivia_game()
 

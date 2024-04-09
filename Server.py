@@ -8,9 +8,9 @@ import random
 from collections import namedtuple
 import socket
 
-ANSI_YELLOW = "\033[33m" # Start
+ANSI_YELLOW = "\033[33m"
 ANSI_RESET = "\033[0m" 
-ANSI_GREEN = "\033[32m" # 
+ANSI_GREEN = "\033[32m"
 ANSI_RED = "\033[31m"
 ANSI_BLUE = "\033[34m"
 
@@ -216,7 +216,7 @@ class Server:
                 
                 counter = 0
                 
-                pool =  concurrent.futures.ThreadPoolExecutor(len(self.playersData))
+                pool = concurrent.futures.ThreadPoolExecutor(len(self.playersData))
 
                 self.get_current_players()
 
@@ -254,17 +254,23 @@ class Server:
                                 self.playersAnswersAmount[s[1]] = value + 1
                             else:
                                 msg += f"{s[1]} is incorrect!\n"
+                        
                     
                     #report of all incorrect\correct players
                     self.send_message_to_clients(msg)
                     #remove all unanswered and wring clients. do nothing if none of the clients were rihgt
                     self.current_players = remove_wrong_answer_players(self.current_players, self.solutionTuples, solution)
-                    
-                    msg = "Congratulations to the winner: "    
-                    if(len(self.current_players) == 1):
-                            msg += f"{self.current_players[0].playerName}\n"
+
+                    if(len(self.current_players) == 1) or len(self.solutionTuples) == 1:
+                            winner_name = None
+                            if(len(self.current_players) == 1):
+                                winner_name = self.current_players[0].playerName
+                            else:
+                                winner_name = self.solutionTuples[0][1]
+                            msg = "Congratulations to the winner: "
+                            msg += f"{winner_name}\n"
                             msg += "Here some statistics about this game:\n"
-                            msg += get_longest_player_name(self)
+                            msg += self.get_longest_player_name()
                             msg += self.getPlayersAnswerMsg()
                             self.send_message_to_clients(msg)
                             self.playersAnswersAmount = {}
@@ -285,23 +291,23 @@ class Server:
             except Exception as e:
                 print_with_color(f"Error : {e}\n Starting game again..\n", ANSI_RED) 
 
-def get_longest_player_name(self):
-    longest_names = []  # Initialize with an empty list
-    max_length = 0  # Initialize max_length to track the length of the longest name
+    def get_longest_player_name(self):
+        longest_names = []  # Initialize with an empty list
+        max_length = 0  # Initialize max_length to track the length of the longest name
 
-    for player in self.playersData:
-        # Check if the length of the player's name is longer than the current longest length
-        if len(player.playerName) > max_length:
-            max_length = len(player.playerName)
-            longest_names = [player.playerName]  # Reset the list with the new longest name
-        elif len(player.playerName) == max_length:
-            longest_names.append(player.playerName)  # Add to the list if name length is same as longest
-        longest_names_str = ""
-        for name in longest_names:
-            longest_names_str += f"{name}, "
-        longest_names_str = longest_names_str[:-2]  # Remove the trailing comma and space
-    return f"The player(s) with the longest name(s) are: {longest_names_str}\n"    
-    
+        for player in self.playersData:
+            # Check if the length of the player's name is longer than the current longest length
+            if len(player.playerName) > max_length:
+                max_length = len(player.playerName)
+                longest_names = [player.playerName]  # Reset the list with the new longest name
+            elif len(player.playerName) == max_length:
+                longest_names.append(player.playerName)  # Add to the list if name length is same as longest
+            longest_names_str = ""
+            for name in longest_names:
+                longest_names_str += f"{name}, "
+            longest_names_str = longest_names_str[:-2]  # Remove the trailing comma and space
+        return f"The player(s) with the longest name(s) are: {longest_names_str}\n"    
+        
 def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
     # Get the names of players who gave the wrong answer    
     wrong_answer_players = {player_name for solution, player_name in solutionTuples if solution != correct_answer}

@@ -93,7 +93,7 @@ class Server:
         for player_data in self.playersData:
             try:
                 player_data.clientSocket.send(msg.encode("utf-8"))
-                updated_players_data.append(player_data)
+                updated_players_data.append(player_data) #append each player that received the welcome message, to the player array.
             except Exception as e:
                 print_with_color(f"Error sending message to {player_data.playerName}: {e}. Removing from the list.", ANSI_RED)
         self.playersData = updated_players_data
@@ -102,7 +102,7 @@ class Server:
         while self.udpflg==False:
             SERVER_NAME_BYTES = SERVER_NAME.encode('utf-8')
             offerMessage = struct.pack(f"Ibh{len(SERVER_NAME_BYTES)}s", 0xabcddcba, 0x2, TCP_PORT, SERVER_NAME_BYTES)
-            broadcast_address = get_wifi_ip_and_broadcast()
+            broadcast_address = get_wifi_ip_and_broadcast() #get the broadcast address of the current computer network
 
             self.UDPSocket.sendto(offerMessage, (broadcast_address, self.udpBroadcastPort))
 
@@ -143,7 +143,7 @@ class Server:
             # Remove the player from current_players
             self.current_players = [p for p in self.current_players  if p.playerName != player.playerName]    
 
-    def startGameMode(self, player:Player, timer):
+    def startGame(self, player:Player, timer):
         start_time = time.time()
         while time.time() - start_time < GAME_TIME_SEC:  # Ensure the loop runs for a maximum of GAME_TIME_SEC seconds
             try:
@@ -206,7 +206,7 @@ class Server:
             userIncides = []
             print_with_color(f"Server started, listening on IP address {self.hostIP}", ANSI_YELLOW)
             try:
-                self.waitForClient()
+                self.waitForClient() #wait until 2 players or more joined the game, or timeout ocurred
 
                 if len(self.playersData) == 0:
                     continue
@@ -218,7 +218,7 @@ class Server:
                 
                 pool =  concurrent.futures.ThreadPoolExecutor(len(self.playersData))
 
-                self.get_current_players()
+                self.get_current_players() # initiate the current player array, at first to the player_data array
 
                 while len(self.current_players) >= 1:
                     timer = time.time() #round is only GAME_TIME_SEC seconds
@@ -233,11 +233,11 @@ class Server:
                     with self.solutionTupleLock:
                         self.solutionTuples.clear()
                     for playerData in self.current_players:
-                        pool.submit(self.startGameMode, playerData, timer)
+                        pool.submit(self.startGame, playerData, timer)
                     
                     start_time = time.time()
                     while time.time() - start_time < GAME_TIME_SEC:
-                        with self.solutionTupleLock:
+                        with self.solutionTupleLock: #lock the solution array, to prevent collisions
                             if(len(self.solutionTuples) == len(self.current_players)):
                                 break
                         time.sleep(0.5)  # Sleep for 0.5 second before rechecking

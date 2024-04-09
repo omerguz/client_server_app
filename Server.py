@@ -5,7 +5,6 @@ import time
 import concurrent
 from concurrent.futures import thread
 import random
-import copy
 from collections import namedtuple
 import socket
 
@@ -15,8 +14,9 @@ ANSI_GREEN = "\033[32m" #
 ANSI_RED = "\033[31m"
 ANSI_BLUE = "\033[34m"
 
+GAME_TIME_SEC = 10
 UDP_PORT = 13117
-TCP_PORT = 12345  # Replace with any available port on your machine
+TCP_PORT = 2009
 BUFFER_SIZE = 1024
 MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
 MESSAGE_TYPE_OFFER = b'\x02'
@@ -54,7 +54,7 @@ def print_with_color(message, color):
 class Server:
     def __init__(self):
         # initialize UDP socket
-        self.udpBroadcastPort = 13117 # UDP broadcast port
+        self.udpBroadcastPort = UDP_PORT # UDP broadcast port
         self.UDPSocket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -64,15 +64,12 @@ class Server:
         self.TCPSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.hostName = socket.gethostname()
         self.hostIP = socket.gethostbyname(self.hostName)
-        self.hostPort = 2009
         self.playersData = [] # Stores information about players (socket, address, name)
         self.current_players = []
         self.solutionTuples = [] # Stores solutions submitted by players (solution, player_name)
         self.solutionTupleLock = threading.Lock() # Lock for thread safety
         self.playerDataLock = threading.Lock() # Lock for thread safety
         self.udpflg = False # Flag for UDP broadcast
-        self.gemeEndTime = 10 # Game end time in seconds
-        self.bufferSize = 1024 # Buffer size for socket communication
         self.playersAnswersAmount = {}
 
             
@@ -80,7 +77,7 @@ class Server:
         con = False
         while not con:
             try:
-                self.TCPSocket.bind(("", self.hostPort))
+                self.TCPSocket.bind(("", TCP_PORT))
                 con = True
             except:
                 pass
@@ -104,13 +101,11 @@ class Server:
     def brodcastUdpOffer(self):    
         while self.udpflg==False:
             SERVER_NAME_BYTES = SERVER_NAME.encode('utf-8')
-            offerMessage = struct.pack(f"Ibh{len(SERVER_NAME_BYTES)}s", 0xabcddcba, 0x2, self.hostPort, SERVER_NAME_BYTES)
+            offerMessage = struct.pack(f"Ibh{len(SERVER_NAME_BYTES)}s", 0xabcddcba, 0x2, TCP_PORT, SERVER_NAME_BYTES)
             broadcast_address = get_wifi_ip_and_broadcast()
 
             self.UDPSocket.sendto(offerMessage, (broadcast_address, self.udpBroadcastPort))
-            # self.UDPSocket.sendto(offerMessage, ('<broadcast>', self.udpBroadcastPort))
-            # offerMessage, (modified_ip, self.udpBroadcastPort))
-            
+
             time.sleep(0.5)
 
 
@@ -119,11 +114,11 @@ class Server:
         UdpBroadcastThread = threading.Thread(target=self.brodcastUdpOffer)
         UdpBroadcastThread.start()
 
-        while (len(self.playersData) >= 1 and time.time() - start_time < 10) or len(self.playersData) < 1:
-            self.TCPSocket.settimeout(10)
+        while (len(self.playersData) >= 1 and time.time() - start_time < GAME_TIME_SEC) or len(self.playersData) < 1:
+            self.TCPSocket.settimeout(GAME_TIME_SEC)
             try:
                 clientSocket, clientAddress = self.TCPSocket.accept()
-                playerName = clientSocket.recv(self.bufferSize).decode("utf-8")
+                playerName = clientSocket.recv(BUFFER_SIZE).decode("utf-8")
                 self.playersData.append(Player(clientSocket, clientAddress, playerName))
                 if len(self.playersData) == 1:    # start the timer when the first client joins
                     start_time = time.time()
@@ -150,13 +145,13 @@ class Server:
 
     def startGameMode(self, player:Player, timer):
         start_time = time.time()
-        while time.time() - start_time < 10:  # Ensure the loop runs for a maximum of 10 seconds
+        while time.time() - start_time < GAME_TIME_SEC:  # Ensure the loop runs for a maximum of GAME_TIME_SEC seconds
             try:
                 # Set a timeout for the recv call
                 player.clientSocket.settimeout(0.5)
                 
                 # Receive data from the player
-                userSolution = player.clientSocket.recv(self.bufferSize).decode("utf-8")
+                userSolution = player.clientSocket.recv(BUFFER_SIZE).decode("utf-8")
                 
                 # Append the solution to the list of solution tuples
                 with self.solutionTupleLock:
@@ -226,7 +221,7 @@ class Server:
                 self.get_current_players()
 
                 while len(self.current_players) >= 1:
-                    timer = time.time() #round is only 10 seconds
+                    timer = time.time() #round is only GAME_TIME_SEC seconds
                     problem = get_random_question(userIncides)
                     solution = problem[IS_TRUE]
                     counter += 1
@@ -241,7 +236,7 @@ class Server:
                         pool.submit(self.startGameMode, playerData, timer)
                     
                     start_time = time.time()
-                    while time.time() - start_time < 10:
+                    while time.time() - start_time < GAME_TIME_SEC:
                         with self.solutionTupleLock:
                             if(len(self.solutionTuples) == len(self.current_players)):
                                 break
@@ -305,7 +300,7 @@ def get_longest_player_name(self):
         for name in longest_names:
             longest_names_str += f"{name}, "
         longest_names_str = longest_names_str[:-2]  # Remove the trailing comma and space
-    return f"The player(s) with the longest name(s) are: {longest_names_str}"    
+    return f"The player(s) with the longest name(s) are: {longest_names_str}\n"    
     
 def remove_wrong_answer_players(current_players, solutionTuples, correct_answer):
     # Get the names of players who gave the wrong answer    

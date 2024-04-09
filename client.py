@@ -12,6 +12,9 @@ ANSI_RED = "\033[31m"
 ANSI_BLUE = "\033[34m"
 
 BUFFER_SIZE = 1024
+UDP_PORT = 13117
+MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
+MESSAGE_TYPE_OFFER = b'\x02'
 
 def print_with_color(message, color):
         print(color + message + ANSI_RESET)
@@ -22,11 +25,7 @@ class Client:
         self.BOT_MODE = bot_mode
         # Server configuration
         self.id = index
-        self.SERVER_PORT = 13117
         self.BOT_SIZE = bot_size
-        self.MAGIC_COOKIE = b'\xab\xcd\xdc\xba'
-        self.MESSAGE_TYPE_OFFER = b'\x02'
-        self.SERVER_PORT_TCP_INDEX = 36
 
     def recvData(self, socket):
         data = None
@@ -76,7 +75,7 @@ class Client:
     # Create a UDP socket to listen for offer messages
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR , 1)
-        udp_socket.bind(("", self.SERVER_PORT))
+        udp_socket.bind(("", UDP_PORT))
 
         msgAndAddr = None
         offerMsgArrived = False
@@ -93,9 +92,9 @@ class Client:
                 # Unpack the offerMessage
                 msgUnPack = struct.unpack(unpack_format, data)
                 # msgUnPack = struct.unpack("Ibh", data)
-                cookie_int = int.from_bytes(self.MAGIC_COOKIE, byteorder='big')
+                cookie_int = int.from_bytes(MAGIC_COOKIE, byteorder='big')
                 magicCookieValid = msgUnPack[0] == cookie_int
-                msgTypeOfferValid = msgUnPack[1] == self.MESSAGE_TYPE_OFFER[0]
+                msgTypeOfferValid = msgUnPack[1] == MESSAGE_TYPE_OFFER[0]
                 if magicCookieValid and msgTypeOfferValid:
                     offerMsgArrived = True
                     msgAndAddr = msgUnPack[2], addr
@@ -169,7 +168,7 @@ class Client:
                     print_with_color(msg, ANSI_BLUE)
                     if msg.startswith("Congratulations"):
                         break
-                    elif f"{self.user_name} is incorrect" in msg and " correct" in msg:
+                    elif (f"{self.user_name} is incorrect" in msg and " correct" in msg) or f"{self.user_name}" not in msg :
                         self.PLAYER_IS_ACTIVE = False 
                     elif msg.startswith("Round"):
                         if(self.PLAYER_IS_ACTIVE):
